@@ -25,36 +25,32 @@ kotlin {
     jvmToolchain(8)
 }
 
+val runtimeWithoutKtlib = configurations.create("runtimeWithoutKtlib") {
+    extendsFrom(configurations.runtimeClasspath.get())
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-test")
+    exclude(group = "org.junit.jupiter", module = "junit-jupiter-api")
+    exclude(group = "org.junit.jupiter", module = "junit-jupiter-engine")
+}
+
 tasks {
     named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
         archiveClassifier.set("with-ktlib")
         mergeServiceFiles()
-        dependencies {
-            exclude(dependency("org.junit.jupiter:junit-jupiter-api"))
-            exclude(dependency("org.junit.jupiter:junit-jupiter-engine"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-test"))
-        }
     }
 
     register<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJarWithoutKtlib") {
         archiveClassifier.set("without-ktlib")
         from(sourceSets.main.get().output)
-        configurations = listOf(project.configurations.runtimeClasspath.get())
+        configurations = listOf(runtimeWithoutKtlib)
         mergeServiceFiles()
-        dependencies {
-            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-jdk8"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-reflect"))
-            exclude(dependency("org.junit.jupiter:junit-jupiter-api"))
-            exclude(dependency("org.junit.jupiter:junit-jupiter-engine"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-test"))
-        }
     }
 
     register<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJarWithoutLibs") {
         archiveClassifier.set("without-libs")
         from(sourceSets.main.get().output)
-        configurations = listOf(project.configurations.runtimeClasspath.get())
         mergeServiceFiles()
     }
 
@@ -66,5 +62,3 @@ tasks {
         dependsOn("shadowJar", "shadowJarWithoutKtlib", "shadowJarWithoutLibs")
     }
 }
-
-
