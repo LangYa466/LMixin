@@ -55,27 +55,26 @@ class SimpleMixin {
     fun originalMethod(): String {
         return "Overwritten"
     }
-}
 
-fun createMockMixinInfo(mixinClassName: String, targetClassName: String): MixinInfo {
-    val mixinClassReader = ClassReader(SimpleMixin::class.java.canonicalName.replace('.', '/'))
-    val mixinClassNode = ClassNode()
-    mixinClassReader.accept(mixinClassNode, 0)
+    @Inject(method = "methodToInject", at = At.HEAD)
+    fun injectHead() {
+        println("Inject at head")
+    }
 
-    val overwriteMethodNode = mixinClassNode.methods.find { it.name == "originalMethod" && it.desc == "()Ljava/lang/String;" }!!
-    return MixinInfo(
-        mixinClassName = mixinClassName,
-        targetClassName = targetClassName,
-        overwriteMethods = listOf(
-            MixinInfo.OverwriteMethod(
-                mixinMethodName = "originalMethod",
-                mixinMethodDesc = "()Ljava/lang/String;",
-                targetMethodName = "originalMethod",
-                targetMethodDesc = "()Ljava/lang/String;",
-                methodNode = overwriteMethodNode
-            )
-        )
-    )
+    @Inject(method = "methodToInject", at = At.TAIL)
+    fun injectTail() {
+        println("Inject at tail")
+    }
+
+    @Inject(method = "originalMethod", at = At.BEFORE, ordinal = 1)
+    fun injectBefore() {
+        println("Inject before originalMethod")
+    }
+
+    @Inject(method = "originalMethod", at = At.AFTER, ordinal = 0)
+    fun injectAfter() {
+        println("Inject after method call in originalMethod")
+    }
 }
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -110,33 +109,45 @@ class MixinTransformerTest {
         assertEquals("Overwritten", result)
     }
 
+    @Test
+    fun testInjectMethods() {
+        val inst = AgentTest.MockInstrumentation()
+        LMMixinAgent.init(inst, "")
+
+        val originalTargetClassBytes = getBytesFromClass(TargetClass::class.java)
+        val transformedBytes = inst.transformers.first().transform(
+            TargetClass::class.java.classLoader,
+            TargetClass::class.java.canonicalName.replace('.', '/'),
+            TargetClass::class.java, null, originalTargetClassBytes
+        )
+
+        val customClassLoader = object : ClassLoader(this.javaClass.classLoader) {
+            override fun findClass(name: String): Class<*> {
+                return if (name == TargetClass::class.java.canonicalName) {
+                    defineClass(name, transformedBytes, 0, transformedBytes.size)
+                } else {
+                    super.findClass(name)
+                }
+            }
+        }
+
+        val transformedClass = customClassLoader.loadClass(TargetClass::class.java.canonicalName)
+        val instance = transformedClass.getDeclaredConstructor().newInstance()
+
+        val methodToInject = transformedClass.getMethod("methodToInject")
+        methodToInject.invoke(instance)
+
+        val originalMethod = transformedClass.getMethod("originalMethod")
+        originalMethod.invoke(instance)
+    }
+
     private fun getBytesFromClass(clazz: Class<*>): ByteArray {
         val resourceStream = clazz.classLoader.getResourceAsStream(clazz.name.replace('.', '/') + ".class")
         return resourceStream?.use { it.readBytes() } ?: ByteArray(0)
     }
 }
 
-// 搞笑奇异
-// fun createMockMixinInfo(mixinClassName: String, targetClassName: String): MixinInfo {
-//    val mixinClassReader = ClassReader(SimpleMixin::class.java.canonicalName.replace('.', '/'))
-//    val mixinClassNode = ClassNode()
-//    mixinClassReader.accept(mixinClassNode, 0)
-//
-//    val overwriteMethodNode = mixinClassNode.methods.find { it.name == "originalMethod" && it.desc == "()Ljava/lang/String;" }!!
-//    return MixinInfo(
-//        mixinClassName = mixinClassName,
-//        targetClassName = targetClassName,
-//        overwriteMethods = listOf(
-//            MixinInfo.OverwriteMethod(
-//                mixinMethodName = "originalMethod",
-//                mixinMethodDesc = "()Ljava/lang/String;",
-//                targetMethodName = "originalMethod",
-//                targetMethodDesc = "()Ljava/lang/String;",
-//                methodNode = overwriteMethodNode
-//            )
-//        )
-//    )
-// }
+
 
 class AgentTest {
 

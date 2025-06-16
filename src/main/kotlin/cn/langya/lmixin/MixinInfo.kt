@@ -11,6 +11,7 @@ data class MixinInfo(
     val shadowMethods: List<ShadowMethod> = emptyList(),
 
     val overwriteMethods: List<OverwriteMethod> = emptyList(),
+    val injectMethods: List<InjectMethod> = emptyList(),
     val newFields: List<FieldNode> = emptyList(),
     val newMethods: List<MethodNode> = emptyList()
 ) {
@@ -25,6 +26,17 @@ data class MixinInfo(
         val mixinMethodDesc: String,
         val targetMethodName: String,
         val targetMethodDesc: String,
+        val methodNode: MethodNode
+    )
+
+    data class InjectMethod(
+        val mixinMethodName: String,
+        val mixinMethodDesc: String,
+        val targetMethodName: String,
+        val targetMethodDesc: String,
+        val at: At,
+        val injectionPointMethodName: String,
+        val ordinal: Int,
         val methodNode: MethodNode
     )
 

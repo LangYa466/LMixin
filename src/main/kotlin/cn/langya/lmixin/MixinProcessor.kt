@@ -2,6 +2,7 @@ package cn.langya.lmixin
 
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.Type
+import org.objectweb.asm.tree.AnnotationNode
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldNode
 import org.objectweb.asm.tree.MethodNode
@@ -24,7 +25,9 @@ class MixinProcessor(private val mappingParser: MappingParser) {
                         if (file.isDirectory) {
                             file.walkTopDown()
                                 .filter { it.isFile && it.extension == "class" }
-                                .forEach { processClassFile(it.inputStream()) }
+                                .forEach {
+                                    it.inputStream().use { stream -> processClassFile(stream) }
+                                }
                         } else if (file.isFile && file.extension == "jar") {
                             processJarFile(JarFile(file))
                         }
@@ -47,16 +50,30 @@ class MixinProcessor(private val mappingParser: MappingParser) {
     private fun processClassFile(inputStream: InputStream) {
         val classReader = ClassReader(inputStream)
         val classNode = ClassNode()
-        classReader.accept(classNode, 0)
+        classReader.accept(classNode, ClassReader.SKIP_CODE)
 
         if (classNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Mixin;" } == true) {
-            parseMixinClass(classNode)
+            inputStream.reset()
+            val fullClassReader = ClassReader(inputStream)
+            val fullClassNode = ClassNode()
+            fullClassReader.accept(fullClassNode, 0)
+            parseMixinClass(fullClassNode)
         }
+    }
+
+    private fun <T> getAnnotationValue(node: AnnotationNode, key: String): T? {
+        val values = node.values ?: return null
+        val keyIndex = values.indexOf(key)
+        if (keyIndex != -1 && keyIndex + 1 < values.size) {
+            @Suppress("UNCHECKED_CAST")
+            return values[keyIndex + 1] as? T
+        }
+        return null
     }
 
     private fun parseMixinClass(mixinClassNode: ClassNode) {
         val mixinAnnotation = mixinClassNode.visibleAnnotations.find { it.desc == "Lcn/langya/lmixin/Mixin;" }
-        val targetClassType = mixinAnnotation?.values?.get(1) as? Type ?: return
+        val targetClassType = getAnnotationValue<Type>(mixinAnnotation!!, "value") ?: return
         val targetClassName = mappingParser.mapClassName(targetClassType.internalName)
 
         val interfaces = mixinClassNode.interfaces?.map { it } ?: emptyList()
@@ -64,15 +81,42 @@ class MixinProcessor(private val mappingParser: MappingParser) {
         val shadowFields = mutableListOf<MixinInfo.ShadowField>()
         val shadowMethods = mutableListOf<MixinInfo.ShadowMethod>()
         val overwriteMethods = mutableListOf<MixinInfo.OverwriteMethod>()
+        val injectMethods = mutableListOf<MixinInfo.InjectMethod>()
         val newFields = mutableListOf<FieldNode>()
         val newMethods = mutableListOf<MethodNode>()
 
         mixinClassNode.fields.forEach { fieldNode ->
-            newFields.add(fieldNode)
+            if (fieldNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Shadow;" } == true) {
+                shadowFields.add(
+                    MixinInfo.ShadowField(
+                        mixinFieldName = fieldNode.name,
+                        targetFieldName = fieldNode.name,
+                        fieldNode = fieldNode
+                    )
+                )
+            } else {
+                newFields.add(fieldNode)
+            }
         }
 
         mixinClassNode.methods.forEach { methodNode ->
+            if (methodNode.name == "<init>" || methodNode.name == "<clinit>") {
+                return@forEach
+            }
+
             when {
+                methodNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Shadow;" } == true -> {
+                    shadowMethods.add(
+                        MixinInfo.ShadowMethod(
+                            methodNode.name,
+                            methodNode.desc,
+                            methodNode.name,
+                            methodNode.desc,
+                            methodNode
+                        )
+                    )
+                }
+
                 methodNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Overwrite;" } == true -> {
                     overwriteMethods.add(
                         MixinInfo.OverwriteMethod(
@@ -80,6 +124,36 @@ class MixinProcessor(private val mappingParser: MappingParser) {
                             methodNode.desc,
                             methodNode.name,
                             methodNode.desc,
+                            methodNode
+                        )
+                    )
+                }
+
+                methodNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Inject;" } == true -> {
+                    val injectAnnotation =
+                        methodNode.visibleAnnotations.find { it.desc == "Lcn/langya/lmixin/Inject;" }!!
+
+                    val targetMethodName = getAnnotationValue<String>(injectAnnotation, "target")
+                    if (targetMethodName == null) {
+                        println("Warning: @Inject in ${mixinClassNode.name}.${methodNode.name} is missing 'target' property. Skipping.")
+                        return@forEach
+                    }
+
+                    val atValue = getAnnotationValue<Array<*>>(injectAnnotation, "at")
+                    val at = At.valueOf((atValue?.get(1) as? String) ?: "HEAD")
+
+                    val injectionPoint = getAnnotationValue<String>(injectAnnotation, "injectionPoint") ?: ""
+                    val ordinal = getAnnotationValue<Int>(injectAnnotation, "ordinal") ?: 0
+
+                    injectMethods.add(
+                        MixinInfo.InjectMethod(
+                            methodNode.name,
+                            methodNode.desc,
+                            targetMethodName,
+                            methodNode.desc,
+                            at,
+                            injectionPoint,
+                            ordinal,
                             methodNode
                         )
                     )
@@ -98,6 +172,7 @@ class MixinProcessor(private val mappingParser: MappingParser) {
             shadowFields,
             shadowMethods,
             overwriteMethods,
+            injectMethods,
             newFields,
             newMethods
         )
