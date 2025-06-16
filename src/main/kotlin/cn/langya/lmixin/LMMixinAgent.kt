@@ -16,8 +16,12 @@ class LMMixinAgent : ClassFileTransformer {
     companion object {
         @JvmStatic
         fun premain(agentArgs: String?, inst: Instrumentation) {
+            init(inst, agentArgs ?: "mappings.srg")
+        }
+
+        @JvmStatic
+        fun init(inst: Instrumentation, srgFilePath: String = "mappings.srg") {
             val agent = LMMixinAgent()
-            val srgFilePath = agentArgs ?: "mappings.srg"
             agent.mappingParser = MappingParser(srgFilePath)
             agent.mixinProcessor = MixinProcessor(agent.mappingParser)
             agent.mixinProcessor.processMixins()
