@@ -89,7 +89,7 @@ class MixinTransformer(
 
                         At.BEFORE -> {
                             val targetCallNodes = targetMethod.instructions.filterIsInstance<MethodInsnNode>()
-                                .filter { it.name == inject.injectionPointMethodName } // 使用正确的属性
+                                .filter { it.name == inject.injectionPointMethodName }
 
                             if (inject.ordinal < targetCallNodes.size) {
                                 val injectionPoint = targetCallNodes[inject.ordinal]
