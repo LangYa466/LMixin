@@ -215,3 +215,183 @@ class AgentTest {
         return resourceStream?.use { it.readBytes() } ?: ByteArray(0)
     }
 }
+
+/**
+ * @Shadow注解测试示例
+ */
+class ShadowTest {
+    
+    // 测试目标类
+    class ShadowTargetClass {
+        private val privateField = "private value"
+        protected val protectedField = "protected value"
+        
+        private fun privateMethod(): String = "private method"
+        protected fun protectedMethod(): String = "protected method"
+        
+        fun publicMethod(): String = "public method"
+    }
+    
+    // 基本@Shadow注解测试
+    @Mixin(ShadowTargetClass::class)
+    class BasicShadowMixin {
+        
+        // 基本@Shadow字段 - 引用目标类的字段
+        @Shadow
+        private val privateField: String = ""
+        
+        // 带重映射的@Shadow字段 - 指定目标字段名
+        @Shadow("protectedField")
+        private val myProtectedField: String = ""
+        
+        // 禁用重映射的@Shadow字段
+        @Shadow(remap = false)
+        private val directField: String = ""
+        
+        // 基本@Shadow方法 - 引用目标类的方法
+        @Shadow
+        private fun privateMethod(): String = ""
+        
+        // 带重映射的@Shadow方法 - 指定目标方法名
+        @Shadow("protectedMethod")
+        private fun myProtectedMethod(): String = ""
+        
+        // 禁用重映射的@Shadow方法
+        @Shadow(remap = false)
+        private fun directMethod(): String = ""
+        
+        // 使用@Shadow字段和方法的示例方法
+        fun exampleUsage() {
+            // 访问@Shadow字段
+            println("Private field: $privateField")
+            println("Protected field: $myProtectedField")
+            println("Direct field: $directField")
+            
+            // 调用@Shadow方法
+            println("Private method: ${privateMethod()}")
+            println("Protected method: ${myProtectedMethod()}")
+            println("Direct method: ${directMethod()}")
+        }
+        
+        // 使用@Overwrite重写目标类的方法
+        @Overwrite
+        fun publicMethod(): String {
+            // 在重写的方法中使用@Shadow成员
+            val originalResult = privateMethod()
+            return "Modified: $originalResult"
+        }
+        
+        // 使用@Inject注入代码
+        @Inject(method = "publicMethod", at = At.HEAD)
+        fun injectAtHead() {
+            println("Injected at head of publicMethod")
+        }
+        
+        @Inject(method = "publicMethod", at = At.TAIL)
+        fun injectAtTail() {
+            println("Injected at tail of publicMethod")
+        }
+    }
+    
+    // 高级@Shadow注解测试
+    @Mixin(ShadowTargetClass::class)
+    class AdvancedShadowMixin {
+        
+        // 引用不同签名的字段
+        @Shadow("fieldWithDifferentName")
+        private val myField: String = ""
+        
+        // 引用不同签名的方法
+        @Shadow("methodWithDifferentName")
+        private fun myMethod(param: Int): String = ""
+        
+        // 在构造函数中使用@Shadow
+        @Inject(method = "<init>", at = At.TAIL)
+        fun constructorInjection() {
+            println("Constructor injection using shadow members")
+            // 可以在这里使用@Shadow字段和方法
+        }
+        
+        // 条件性使用@Shadow成员
+        fun conditionalUsage(condition: Boolean) {
+            if (condition) {
+                // 使用@Shadow成员
+                val value = myField
+                val result = myMethod(42)
+                println("Conditional usage: $value, $result")
+            }
+        }
+    }
+    
+    // 最佳实践测试
+    @Mixin(ShadowTargetClass::class)
+    class BestPracticeShadowMixin {
+        
+        // 好的做法：提供默认值，使用private修饰符
+        @Shadow
+        private val targetField: String = ""
+        
+        // 好的做法：指定目标成员名
+        @Shadow("specificFieldName")
+        private val myField: String = ""
+        
+        // 好的做法：禁用重映射（当目标成员名已知时）
+        @Shadow(remap = false)
+        private val knownField: String = ""
+        
+        // 好的做法：在方法中使用@Shadow成员
+        fun demonstrateUsage() {
+            // 使用@Shadow字段
+            val fieldValue = targetField
+            
+            // 使用@Shadow方法
+            val methodResult = targetMethod()
+            
+            // 处理结果
+            println("Field: $fieldValue, Method: $methodResult")
+        }
+        
+        @Shadow
+        private fun targetMethod(): String = ""
+    }
+    
+    @Test
+    fun testShadowAnnotation() {
+        val inst = AgentTest.MockInstrumentation()
+        LMMixinAgent.init(inst, "")
+        
+        // 测试@Shadow注解的基本功能
+        val originalTargetClassBytes = getBytesFromClass(ShadowTargetClass::class.java)
+        val transformedBytes = inst.transformers.first().transform(
+            ShadowTargetClass::class.java.classLoader,
+            ShadowTargetClass::class.java.canonicalName.replace('.', '/'),
+            ShadowTargetClass::class.java, null, originalTargetClassBytes
+        )
+        
+        val customClassLoader = object : ClassLoader(this.javaClass.classLoader) {
+            override fun findClass(name: String): Class<*> {
+                return if (name == ShadowTargetClass::class.java.canonicalName) {
+                    defineClass(name, transformedBytes, 0, transformedBytes.size)
+                } else {
+                    super.findClass(name)
+                }
+            }
+        }
+        
+        val transformedClass = customClassLoader.loadClass(ShadowTargetClass::class.java.canonicalName)
+        val instance = transformedClass.getDeclaredConstructor().newInstance()
+        
+        // 测试重写的方法
+        val method = transformedClass.getMethod("publicMethod")
+        val result = method.invoke(instance) as String
+        
+        // 验证结果包含@Shadow方法调用的结果
+        assertEquals(true, result.contains("Modified:"))
+        assertEquals(true, result.contains("private method"))
+    }
+    
+    private fun getBytesFromClass(clazz: Class<*>): ByteArray {
+        val resourceStream = clazz.classLoader.getResourceAsStream(clazz.name.replace('.', '/') + ".class")
+        return resourceStream?.use { it.readBytes() } ?: ByteArray(0)
+    }
+}

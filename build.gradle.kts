@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "cn.langya"
-version = "1.0-SNAPSHOT"
+version = "1.01-SNAPSHOT"
 
 repositories {
     mavenCentral()

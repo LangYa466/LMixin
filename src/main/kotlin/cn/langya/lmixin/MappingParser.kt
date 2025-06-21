@@ -41,7 +41,8 @@ class MappingParser(srgFilePath: String) {
         return methodMap["$owner/$obfName$obfDesc"]?.substringBefore("(")?.substringAfterLast("/") ?: obfName
     }
 
-    fun mapMethodDesc(owner: String, obfName: String, obfDesc: String): String {
-        return methodMap["$owner/$obfName$obfDesc"]?.substringAfter("(")?.let { "($it" } ?: obfDesc
+    // TODO 待实现
+    fun mapMethodDesc(obfDesc: String): String {
+        return obfDesc
     }
 }

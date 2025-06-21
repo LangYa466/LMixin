@@ -19,8 +19,17 @@ enum class At(val value: String) {
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class Inject(val method: String, val at: At = At.HEAD, val ordinal: Int = 0)
+annotation class Inject(
+    val method: String, 
+    val at: At = At.HEAD, 
+    val ordinal: Int = 0,
+    val target: String = "",
+    val injectionPoint: String = ""
+)
 
 @Target(AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class Shadow
+annotation class Shadow(
+    val value: String = "",
+    val remap: Boolean = true
+)

@@ -18,12 +18,23 @@ class MixinTransformer(
                 is FieldInsnNode -> {
                     if (insn.owner == mixinInfo.mixinClassName) {
                         insn.owner = mixinInfo.targetClassName
+                        val shadowField = mixinInfo.shadowFields.find { it.mixinFieldName == insn.name }
+                        if (shadowField != null) {
+                            insn.name = shadowField.targetFieldName
+                        }
                     }
                 }
 
                 is MethodInsnNode -> {
                     if (insn.owner == mixinInfo.mixinClassName) {
                         insn.owner = mixinInfo.targetClassName
+                        val shadowMethod = mixinInfo.shadowMethods.find { 
+                            it.mixinMethodName == insn.name && it.mixinMethodDesc == insn.desc 
+                        }
+                        if (shadowMethod != null) {
+                            insn.name = shadowMethod.targetMethodName
+                            insn.desc = shadowMethod.targetMethodDesc
+                        }
                     }
                 }
             }

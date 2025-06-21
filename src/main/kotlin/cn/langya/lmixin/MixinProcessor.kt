@@ -86,11 +86,15 @@ class MixinProcessor(private val mappingParser: MappingParser) {
         val newMethods = mutableListOf<MethodNode>()
 
         mixinClassNode.fields.forEach { fieldNode ->
-            if (fieldNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Shadow;" } == true) {
+            val shadowAnnotation = fieldNode.visibleAnnotations?.find { it.desc == "Lcn/langya/lmixin/Shadow;" }
+            if (shadowAnnotation != null) {
+                val targetFieldName = getAnnotationValue<String>(shadowAnnotation, "value") ?: fieldNode.name
+                val remap = getAnnotationValue<Boolean>(shadowAnnotation, "remap") ?: true
+                
                 shadowFields.add(
                     MixinInfo.ShadowField(
                         mixinFieldName = fieldNode.name,
-                        targetFieldName = fieldNode.name,
+                        targetFieldName = if (remap) mappingParser.mapFieldName(targetClassName, targetFieldName) else targetFieldName,
                         fieldNode = fieldNode
                     )
                 )
@@ -106,12 +110,16 @@ class MixinProcessor(private val mappingParser: MappingParser) {
 
             when {
                 methodNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Shadow;" } == true -> {
+                    val shadowAnnotation = methodNode.visibleAnnotations.find { it.desc == "Lcn/langya/lmixin/Shadow;" }!!
+                    val targetMethodName = getAnnotationValue<String>(shadowAnnotation, "value") ?: methodNode.name
+                    val remap = getAnnotationValue<Boolean>(shadowAnnotation, "remap") ?: true
+                    
                     shadowMethods.add(
                         MixinInfo.ShadowMethod(
                             methodNode.name,
                             methodNode.desc,
-                            methodNode.name,
-                            methodNode.desc,
+                            if (remap) mappingParser.mapMethodName(targetClassName, targetMethodName, methodNode.desc) else targetMethodName,
+                            if (remap) mappingParser.mapMethodDesc(methodNode.desc) else methodNode.desc,
                             methodNode
                         )
                     )
@@ -133,9 +141,10 @@ class MixinProcessor(private val mappingParser: MappingParser) {
                     val injectAnnotation =
                         methodNode.visibleAnnotations.find { it.desc == "Lcn/langya/lmixin/Inject;" }!!
 
-                    val targetMethodName = getAnnotationValue<String>(injectAnnotation, "target")
-                    if (targetMethodName == null) {
-                        println("Warning: @Inject in ${mixinClassNode.name}.${methodNode.name} is missing 'target' property. Skipping.")
+                    val targetMethodName = getAnnotationValue<String>(injectAnnotation, "method") ?: 
+                                         getAnnotationValue<String>(injectAnnotation, "target") ?: ""
+                    if (targetMethodName.isEmpty()) {
+                        println("Warning: @Inject in ${mixinClassNode.name}.${methodNode.name} is missing 'method' property. Skipping.")
                         return@forEach
                     }
 
