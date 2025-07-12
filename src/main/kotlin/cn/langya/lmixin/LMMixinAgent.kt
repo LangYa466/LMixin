@@ -14,6 +14,8 @@ class LMMixinAgent : ClassFileTransformer {
     internal lateinit var mixinProcessor: MixinProcessor
 
     companion object {
+        private var currentAgent: LMMixinAgent? = null
+        
         @JvmStatic
         fun premain(agentArgs: String?, inst: Instrumentation) {
             init(inst, agentArgs ?: "mappings.srg")
@@ -27,7 +29,19 @@ class LMMixinAgent : ClassFileTransformer {
             agent.mixinProcessor.processMixins()
             inst.addTransformer(agent)
             
-            LMMixinJavaAPI.init(inst, srgFilePath)
+            // 保存当前agent实例的引用
+            currentAgent = agent
+            
+            LMMixinAPI.init(inst, srgFilePath)
+        }
+        
+        /**
+         * 获取当前agent实例
+         * @return LMMixinAgent? 当前agent实例，如果未初始化则返回null
+         */
+        @JvmStatic
+        fun getCurrentAgent(): LMMixinAgent? {
+            return currentAgent
         }
         
         /**
@@ -36,8 +50,7 @@ class LMMixinAgent : ClassFileTransformer {
          */
         @JvmStatic
         fun getProcessedClassesBytes(): Map<String, ByteArray> {
-            // 注意：这个方法需要在init之后调用才能获取到数据
-            return emptyMap() // 这里需要访问mixinProcessor实例
+            return currentAgent?.getProcessedClassesBytesInstance() ?: emptyMap()
         }
     }
 
@@ -64,5 +77,13 @@ class LMMixinAgent : ClassFileTransformer {
             return classWriter.toByteArray()
         }
         return null
+    }
+    
+    /**
+     * 获取所有处理过的类的字节码映射（实例方法）
+     * @return Map<String, ByteArray> 类名到字节码的映射
+     */
+    fun getProcessedClassesBytesInstance(): Map<String, ByteArray> {
+        return mixinProcessor.getBytes()
     }
 }

@@ -11,6 +11,11 @@ class MixinTransformer(
     private val mixinInfo: MixinInfo
 ) : ClassNode(api) {
 
+    /**
+     * 使用默认ASM版本的构造函数
+     */
+    constructor(cv: ClassVisitor, mixinInfo: MixinInfo) : this(Opcodes.ASM9, cv, mixinInfo)
+
     private fun remapMethodNode(methodNode: MethodNode) {
         val instructions = methodNode.instructions ?: return
         for (insn in instructions) {
@@ -128,5 +133,85 @@ class MixinTransformer(
         }
 
         accept(cv)
+    }
+    
+    /**
+     * 获取mixin信息
+     * @return MixinInfo mixin信息
+     */
+    fun getMixinInfo(): MixinInfo {
+        return mixinInfo
+    }
+    
+    /**
+     * 获取目标类名
+     * @return String 目标类名
+     */
+    fun getTargetClassName(): String {
+        return mixinInfo.targetClassName
+    }
+    
+    /**
+     * 获取mixin类名
+     * @return String mixin类名
+     */
+    fun getMixinClassName(): String {
+        return mixinInfo.mixinClassName
+    }
+    
+    /**
+     * 获取接口数量
+     * @return Int 接口数量
+     */
+    fun getInterfaceCount(): Int {
+        return mixinInfo.interfaces.size
+    }
+    
+    /**
+     * 获取新字段数量
+     * @return Int 新字段数量
+     */
+    fun getNewFieldCount(): Int {
+        return mixinInfo.newFields.size
+    }
+    
+    /**
+     * 获取新方法数量
+     * @return Int 新方法数量
+     */
+    fun getNewMethodCount(): Int {
+        return mixinInfo.newMethods.size
+    }
+    
+    /**
+     * 获取Shadow字段数量
+     * @return Int Shadow字段数量
+     */
+    fun getShadowFieldCount(): Int {
+        return mixinInfo.shadowFields.size
+    }
+    
+    /**
+     * 获取Shadow方法数量
+     * @return Int Shadow方法数量
+     */
+    fun getShadowMethodCount(): Int {
+        return mixinInfo.shadowMethods.size
+    }
+    
+    /**
+     * 获取Overwrite方法数量
+     * @return Int Overwrite方法数量
+     */
+    fun getOverwriteMethodCount(): Int {
+        return mixinInfo.overwriteMethods.size
+    }
+    
+    /**
+     * 获取Inject方法数量
+     * @return Int Inject方法数量
+     */
+    fun getInjectMethodCount(): Int {
+        return mixinInfo.injectMethods.size
     }
 }

@@ -18,6 +18,16 @@ class MixinProcessor(private val mappingParser: MappingParser) {
     // 存储所有处理过的类的字节码
     private val processedClasses = mutableMapOf<String, ByteArray>()
 
+    /**
+     * 默认构造函数，使用默认的MappingParser
+     */
+    constructor() : this(MappingParser())
+    
+    /**
+     * 使用指定映射文件路径的构造函数
+     */
+    constructor(srgFilePath: String) : this(MappingParser(srgFilePath))
+
     fun processMixins() {
         val classLoader = ClassLoader.getSystemClassLoader()
         if (classLoader is URLClassLoader) {
@@ -38,6 +48,38 @@ class MixinProcessor(private val mappingParser: MappingParser) {
                 }
             }
         }
+    }
+    
+    /**
+     * 处理指定目录中的类文件
+     * @param directory 目录路径
+     */
+    fun processMixinsFromDirectory(directory: String) {
+        val dir = File(directory)
+        if (!dir.exists() || !dir.isDirectory) {
+            println("Warning: Directory $directory does not exist or is not a directory")
+            return
+        }
+        
+        dir.walkTopDown()
+            .filter { it.isFile && it.extension == "class" }
+            .forEach {
+                it.inputStream().use { stream -> processClassFile(stream) }
+            }
+    }
+    
+    /**
+     * 处理指定JAR文件中的类文件
+     * @param jarFilePath JAR文件路径
+     */
+    fun processMixinsFromJar(jarFilePath: String) {
+        val jarFile = File(jarFilePath)
+        if (!jarFile.exists() || !jarFile.isFile) {
+            println("Warning: JAR file $jarFilePath does not exist or is not a file")
+            return
+        }
+        
+        processJarFile(JarFile(jarFile))
     }
 
     private fun processJarFile(jarFile: JarFile) {
@@ -201,5 +243,65 @@ class MixinProcessor(private val mappingParser: MappingParser) {
      */
     fun getBytes(): Map<String, ByteArray> {
         return processedClasses.toMap()
+    }
+    
+    /**
+     * 获取指定类的字节码
+     * @param className 类名
+     * @return ByteArray? 类的字节码，如果不存在则返回null
+     */
+    fun getClassBytes(className: String): ByteArray? {
+        return processedClasses[className]
+    }
+    
+    /**
+     * 获取所有处理过的类名列表
+     * @return List<String> 类名列表
+     */
+    fun getProcessedClassNames(): List<String> {
+        return processedClasses.keys.toList()
+    }
+    
+    /**
+     * 检查指定类是否已被处理
+     * @param className 类名
+     * @return Boolean 是否已处理
+     */
+    fun isClassProcessed(className: String): Boolean {
+        return processedClasses.containsKey(className)
+    }
+    
+    /**
+     * 获取处理过的类数量
+     * @return Int 类数量
+     */
+    fun getProcessedClassCount(): Int {
+        return processedClasses.size
+    }
+    
+    /**
+     * 获取mixin映射数量
+     * @return Int mixin映射数量
+     */
+    fun getMixinMapSize(): Int {
+        return mixinMap.size
+    }
+    
+    /**
+     * 获取指定目标类的mixin信息列表
+     * @param targetClassName 目标类名
+     * @return List<MixinInfo>? mixin信息列表，如果不存在则返回null
+     */
+    fun getMixinsForClass(targetClassName: String): List<MixinInfo>? {
+        return mixinMap[targetClassName]
+    }
+    
+    /**
+     * 检查指定目标类是否有mixin
+     * @param targetClassName 目标类名
+     * @return Boolean 是否有mixin
+     */
+    fun hasMixinsForClass(targetClassName: String): Boolean {
+        return mixinMap.containsKey(targetClassName) && mixinMap[targetClassName]?.isNotEmpty() == true
     }
 }
