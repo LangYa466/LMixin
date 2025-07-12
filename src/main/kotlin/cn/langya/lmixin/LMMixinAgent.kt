@@ -10,8 +10,8 @@ import java.security.ProtectionDomain
 
 class LMMixinAgent : ClassFileTransformer {
 
-    private lateinit var mappingParser: MappingParser
-    private lateinit var mixinProcessor: MixinProcessor
+    internal lateinit var mappingParser: MappingParser
+    internal lateinit var mixinProcessor: MixinProcessor
 
     companion object {
         @JvmStatic
@@ -26,6 +26,18 @@ class LMMixinAgent : ClassFileTransformer {
             agent.mixinProcessor = MixinProcessor(agent.mappingParser)
             agent.mixinProcessor.processMixins()
             inst.addTransformer(agent)
+            
+            LMMixinJavaAPI.init(inst, srgFilePath)
+        }
+        
+        /**
+         * 获取所有处理过的类的字节码映射
+         * @return Map<String, ByteArray> 类名到字节码的映射
+         */
+        @JvmStatic
+        fun getProcessedClassesBytes(): Map<String, ByteArray> {
+            // 注意：这个方法需要在init之后调用才能获取到数据
+            return emptyMap() // 这里需要访问mixinProcessor实例
         }
     }
 

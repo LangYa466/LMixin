@@ -15,6 +15,9 @@ import org.objectweb.asm.tree.ClassNode
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestInstance.Lifecycle
 import java.nio.file.Path
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
 
 class MappingParserTest {
 
@@ -393,5 +396,75 @@ class ShadowTest {
     private fun getBytesFromClass(clazz: Class<*>): ByteArray {
         val resourceStream = clazz.classLoader.getResourceAsStream(clazz.name.replace('.', '/') + ".class")
         return resourceStream?.use { it.readBytes() } ?: ByteArray(0)
+    }
+}
+
+class GetBytesTest {
+    
+    @Test
+    fun testGetBytesMethod() {
+        val inst = AgentTest.MockInstrumentation()
+        LMMixinAgent.init(inst, "")
+        
+        // 测试Java API
+        val bytesMap = LMMixinJavaAPI.getBytes()
+        assertNotNull(bytesMap)
+        
+        // 测试获取指定类字节码
+        val targetClassBytes = LMMixinJavaAPI.getClassBytes("cn/langya/lmixin/TargetClass")
+        assertNotNull(targetClassBytes)
+        assertTrue(targetClassBytes!!.isNotEmpty())
+        
+        // 测试获取处理过的类名列表
+        val classNames = LMMixinJavaAPI.getProcessedClassNames()
+        assertNotNull(classNames)
+        assertTrue(classNames.isNotEmpty())
+        
+        // 测试检查类是否已处理
+        assertTrue(LMMixinJavaAPI.isClassProcessed("cn/langya/lmixin/TargetClass"))
+        assertFalse(LMMixinJavaAPI.isClassProcessed("cn/langya/lmixin/NonExistentClass"))
+        
+        // 测试获取处理过的类数量
+        val count = LMMixinJavaAPI.getProcessedClassCount()
+        assertTrue(count > 0)
+    }
+    
+    @Test
+    fun testGetBytesFromMixinProcessor() {
+        val inst = AgentTest.MockInstrumentation()
+        LMMixinAgent.init(inst, "")
+        
+        // 通过反射获取mixinProcessor实例来测试getBytes方法
+        val agent = inst.transformers.first() as LMMixinAgent
+        val mixinProcessorField = LMMixinAgent::class.java.getDeclaredField("mixinProcessor")
+        mixinProcessorField.isAccessible = true
+        val mixinProcessor = mixinProcessorField.get(agent) as MixinProcessor
+        
+        val bytesMap = mixinProcessor.getBytes()
+        assertNotNull(bytesMap)
+        assertTrue(bytesMap.isNotEmpty())
+        
+        // 验证包含目标类
+        assertTrue(bytesMap.containsKey("cn/langya/lmixin/TargetClass"))
+        assertTrue(bytesMap.containsKey("cn/langya/lmixin/SimpleMixin"))
+    }
+    
+    @Test
+    fun testGetBytesContent() {
+        val inst = AgentTest.MockInstrumentation()
+        LMMixinAgent.init(inst, "")
+        
+        val bytesMap = LMMixinJavaAPI.getBytes()
+        
+        // 验证字节码内容
+        bytesMap.forEach { (className, bytes) ->
+            assertTrue(bytes.isNotEmpty(), "Class $className should have non-empty bytecode")
+            
+            // 验证字节码以0xCAFEBABE开头（Java类文件魔数）
+            assertEquals(0xCA.toByte(), bytes[0], "Class $className should start with Java class file magic number")
+            assertEquals(0xFE.toByte(), bytes[1], "Class $className should start with Java class file magic number")
+            assertEquals(0xBA.toByte(), bytes[2], "Class $className should start with Java class file magic number")
+            assertEquals(0xBE.toByte(), bytes[3], "Class $className should start with Java class file magic number")
+        }
     }
 }

@@ -393,3 +393,150 @@ LMixin 框架提供了强大的字节码操作能力，通过 `@Mixin`、`@Shado
 - 在文档中说明用途
 - 注意类型匹配
 - 合理使用 remap 参数
+
+## Java API 支持
+
+LMixin 提供了完整的 Java API 支持，让 Java 开发者也能轻松使用 LMixin 的功能。
+
+### 初始化
+
+```java
+import cn.langya.lmixin.LMMixinJavaAPI;
+import java.lang.instrument.Instrumentation;
+
+public class MyJavaApplication {
+    public static void premain(String agentArgs, Instrumentation inst) {
+        // 初始化 LMixin
+        LMMixinJavaAPI.init(inst, "mappings.srg");
+    }
+}
+```
+
+### 获取字节码
+
+```java
+import cn.langya.lmixin.LMMixinJavaAPI;
+import java.util.Map;
+
+public class BytecodeExample {
+    public void getProcessedClasses() {
+        // 获取所有处理过的类的字节码映射
+        Map<String, byte[]> bytesMap = LMMixinJavaAPI.getBytes();
+        
+        // 获取指定类的字节码
+        byte[] targetClassBytes = LMMixinJavaAPI.getClassBytes("cn/langya/lmixin/TargetClass");
+        
+        // 获取所有处理过的类名列表
+        List<String> classNames = LMMixinJavaAPI.getProcessedClassNames();
+        
+        // 检查指定类是否已被处理
+        boolean isProcessed = LMMixinJavaAPI.isClassProcessed("cn/langya/lmixin/TargetClass");
+        
+        // 获取处理过的类数量
+        int count = LMMixinJavaAPI.getProcessedClassCount();
+    }
+}
+```
+
+### API 方法说明
+
+#### `getBytes(): Map<String, ByteArray>`
+获取所有处理过的类的字节码映射。
+- **返回**: 类名到字节码的映射
+- **类名格式**: 内部格式，如 `cn/langya/lmixin/ExampleClass`
+
+#### `getClassBytes(className: String): ByteArray?`
+获取指定类的字节码。
+- **参数**: `className` - 类名（内部格式）
+- **返回**: 类的字节码，如果不存在则返回 `null`
+
+#### `getProcessedClassNames(): List<String>`
+获取所有处理过的类名列表。
+- **返回**: 类名列表
+
+#### `isClassProcessed(className: String): Boolean`
+检查指定类是否已被处理。
+- **参数**: `className` - 类名
+- **返回**: 是否已处理
+
+#### `getProcessedClassCount(): Int`
+获取处理过的类数量。
+- **返回**: 类数量
+
+### 使用场景
+
+#### 1. 字节码分析
+```java
+public class BytecodeAnalyzer {
+    public void analyzeProcessedClasses() {
+        Map<String, byte[]> bytesMap = LMMixinJavaAPI.getBytes();
+        
+        bytesMap.forEach((className, bytes) -> {
+            System.out.println("Class: " + className);
+            System.out.println("Size: " + bytes.length + " bytes");
+            
+            // 验证Java类文件魔数
+            if (bytes.length >= 4) {
+                boolean isValidClass = bytes[0] == (byte) 0xCA && 
+                                     bytes[1] == (byte) 0xFE && 
+                                     bytes[2] == (byte) 0xBA && 
+                                     bytes[3] == (byte) 0xBE;
+                System.out.println("Valid Java class: " + isValidClass);
+            }
+        });
+    }
+}
+```
+
+#### 2. 动态类加载
+```java
+public class DynamicClassLoader {
+    public Class<?> loadProcessedClass(String className) throws ClassNotFoundException {
+        byte[] classBytes = LMMixinJavaAPI.getClassBytes(className);
+        if (classBytes == null) {
+            throw new ClassNotFoundException("Class not found: " + className);
+        }
+        
+        // 使用自定义ClassLoader加载类
+        return defineClass(className.replace('/', '.'), classBytes, 0, classBytes.length);
+    }
+}
+```
+
+#### 3. 调试和监控
+```java
+public class MixinDebugger {
+    public void debugMixinProcessing() {
+        System.out.println("Processed classes count: " + LMMixinJavaAPI.getProcessedClassCount());
+        
+        List<String> classNames = LMMixinJavaAPI.getProcessedClassNames();
+        System.out.println("Processed classes:");
+        classNames.forEach(System.out::println);
+        
+        // 检查特定类是否被处理
+        String targetClass = "cn/langya/lmixin/TargetClass";
+        if (LMMixinJavaAPI.isClassProcessed(targetClass)) {
+            System.out.println(targetClass + " has been processed");
+            byte[] bytes = LMMixinJavaAPI.getClassBytes(targetClass);
+            System.out.println("Bytecode size: " + bytes.length + " bytes");
+        }
+    }
+}
+```
+
+### 注意事项
+
+1. **初始化顺序**: 必须在调用任何 API 方法之前先调用 `LMMixinJavaAPI.init()`
+2. **类名格式**: 使用内部格式的类名（用 `/` 分隔，如 `cn/langya/lmixin/ExampleClass`）
+3. **线程安全**: API 方法是线程安全的，可以在多线程环境中使用
+4. **内存管理**: 返回的字节码数组是原始数据的副本，可以安全地修改和保存
+
+## 更新日志
+
+### v1.01-SNAPSHOT
+- ✅ 添加了 `getBytes()` 方法支持
+- ✅ 提供了完整的 Java API 接口
+- ✅ 修复了 InputStream reset 问题
+- ✅ 增强了错误处理和类型安全
+- ✅ 添加了详细的测试用例
+- ✅ 完善了文档说明

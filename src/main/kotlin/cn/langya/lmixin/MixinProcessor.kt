@@ -14,6 +14,9 @@ import java.util.jar.JarFile
 class MixinProcessor(private val mappingParser: MappingParser) {
 
     val mixinMap = mutableMapOf<String, MutableList<MixinInfo>>()
+    
+    // 存储所有处理过的类的字节码
+    private val processedClasses = mutableMapOf<String, ByteArray>()
 
     fun processMixins() {
         val classLoader = ClassLoader.getSystemClassLoader()
@@ -48,17 +51,20 @@ class MixinProcessor(private val mappingParser: MappingParser) {
     }
 
     private fun processClassFile(inputStream: InputStream) {
-        val classReader = ClassReader(inputStream)
+        val bytes = inputStream.readBytes()
+        val classReader = ClassReader(bytes)
         val classNode = ClassNode()
         classReader.accept(classNode, ClassReader.SKIP_CODE)
 
         if (classNode.visibleAnnotations?.any { it.desc == "Lcn/langya/lmixin/Mixin;" } == true) {
-            inputStream.reset()
-            val fullClassReader = ClassReader(inputStream)
+            val fullClassReader = ClassReader(bytes)
             val fullClassNode = ClassNode()
             fullClassReader.accept(fullClassNode, 0)
             parseMixinClass(fullClassNode)
         }
+        
+        // 保存处理过的类字节码
+        processedClasses[classNode.name] = bytes
     }
 
     private fun <T> getAnnotationValue(node: AnnotationNode, key: String): T? {
@@ -187,5 +193,13 @@ class MixinProcessor(private val mappingParser: MappingParser) {
         )
 
         mixinMap.computeIfAbsent(targetClassName) { mutableListOf() }.add(mixinInfo)
+    }
+    
+    /**
+     * 获取所有处理过的类的字节码映射
+     * @return Map<String, ByteArray> 类名到字节码的映射
+     */
+    fun getBytes(): Map<String, ByteArray> {
+        return processedClasses.toMap()
     }
 }
