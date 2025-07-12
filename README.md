@@ -2,6 +2,8 @@
 
 LMixin 是一个基于 ASM 的 Kotlin 库，让你可以像写普通类一样写 Mixin，轻松修改或增强 Java 字节码，无需动原始代码。
 
+使用方法：`implementation 'com.github.LangYa466:LMixin:版本号'`，详见 [JitPack 页面](https://jitpack.io/#LangYa466/LMixin)。
+
 ## 主要特性
 - 灵活的名称映射
 - 字节码注入（支持方法头/尾/前/后）
